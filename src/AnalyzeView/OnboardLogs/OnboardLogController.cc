@@ -1147,9 +1147,11 @@ void OnboardLogController::_ftpFinishListing()
 {
     _ftpListState = FtpListState::Idle;
 
-    // Firmware which NAKs kCmdListDirectoryWithTime (PX4 <= 1.17) reports no modification times
-    // over FTP. Fall back to the message based transport where LOG_ENTRY reports the dates (issue #14789).
-    if (_vehicle && _vehicle->ftpManager()->listDirectoryWithTimeUnsupported()) {
+    // PX4 <= 1.17 may not support timestamped FTP listings. Preserve the message-based
+    // fallback for PX4 so LOG_ENTRY can supply log dates (issue #14789).
+    // ArduPilot's standard FTP listing can still be used to download log files even
+    // without timestamp metadata; do not disable FTP solely for that limitation.
+    if (_vehicle && _vehicle->px4Firmware() && _vehicle->ftpManager()->listDirectoryWithTimeUnsupported()) {
         _ftpFallbackToMessages();
         return;
     }
