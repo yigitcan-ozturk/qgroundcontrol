@@ -30,6 +30,7 @@ private slots:
     void _ftpListSubdirTest_data();
     void _ftpListSubdirTest();
     void _ftpListNoTimeFallbackTest();
+    void _ardupilotFtpListWithoutTimeTest();
     void _messagesZeroByteLogTest();
     void _ftpCancelListNoFallbackTest();
     void _ftpListFallbackTest();
