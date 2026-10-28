@@ -405,6 +405,46 @@ void OnboardLogFtpDownloadTest::_ftpListNoTimeFallbackTest()
     QCOMPARE(file.readAll(), _mockLink->mockLinkFTP()->logFileContents(QStringLiteral("log_2.ulg")));
 }
 
+void OnboardLogFtpDownloadTest::_ardupilotFtpListWithoutTimeTest()
+{
+    _connectMockLink(MAV_AUTOPILOT_ARDUPILOTMEGA, MockConfiguration::FailNone, MockConfiguration::OptionFtpCapability);
+    if (QTest::currentTestFailed()) return;
+
+    // ArduPilot can NAK kCmdListDirectoryWithTime while supporting ordinary FTP
+    // listings and downloads. Missing timestamps alone must not force LOG_REQUEST_DATA.
+    MockLinkFTP* const mockLinkFTP = _mockLink->mockLinkFTP();
+    mockLinkFTP->setLogFiles({
+        {QStringLiteral("00000021.BIN"), 5000, 1700000000},
+    });
+    mockLinkFTP->setListDirectoryWithTimeSupported(false);
+
+    OnboardLogController* const controller = new OnboardLogController(this);
+    MultiSignalSpy* const multiSpy = new MultiSignalSpy(this);
+    QVERIFY(multiSpy->init(controller));
+
+    QVERIFY(refreshAndWaitForListComplete(controller, multiSpy));
+    QCOMPARE(controller->transport(), QStringLiteral("ftp"));
+
+    QmlObjectListModel* const model = controller->_getModel();
+    QVERIFY(model);
+    QCOMPARE(model->count(), 1);
+    QGCOnboardLogEntry* const entry = model->value<QGCOnboardLogEntry*>(0);
+    QVERIFY(entry);
+    QCOMPARE(entry->ftpPath(), QStringLiteral("@MAV_LOG/00000021.BIN"));
+    QCOMPARE(entry->size(), 5000);
+
+    QTemporaryDir tempDir;
+    QVERIFY(tempDir.isValid());
+    entry->setSelected(true);
+    QVERIFY(downloadAndWaitForComplete(controller, multiSpy, tempDir.path()));
+
+    const QString downloadFile = QDir(tempDir.path()).filePath(QStringLiteral("00000021.BIN"));
+    QFile file(downloadFile);
+    QVERIFY(file.open(QIODevice::ReadOnly));
+    QCOMPARE(file.readAll(), mockLinkFTP->logFileContents(QStringLiteral("00000021.BIN")));
+    QCOMPARE(entry->status(), QStringLiteral("Downloaded"));
+}
+
 void OnboardLogFtpDownloadTest::_messagesZeroByteLogTest()
 {
     _connectMockLink(MAV_AUTOPILOT_PX4, MockConfiguration::FailNone, MockConfiguration::OptionFtpCapability);
